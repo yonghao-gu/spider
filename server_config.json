@@ -1,0 +1,22 @@
+{
+    "db": {
+        "addr": "", 
+        "port": "", 
+        "user": "", 
+        "password": ""
+    },
+    "mail":{
+        "user":"",
+        "password":"",
+        "host":"",
+        "to":[""],
+        "port":465
+    },
+    "log":"./log.log",
+    "abort":"stop_server",
+    "user":{
+        "user":"",
+        "password":""
+    }
+}
+
