@@ -11,12 +11,11 @@ import tools
 import log
 import codecs
 import re
+import global_obj
 
-from spiker import get_url,new_session,url_encode,js2py_val
+from spiker import get_url,new_session,url_encode,js2py_val,is_not_ok
 
 g_session = None
-
-
 
 
 #获取小区信息
@@ -39,12 +38,17 @@ def get_community_info(cityName, keyword, filter_word = None):
 
     url = url_encode("https://ajax.api.ke.com/sug/headerSearch", data)
     result,_ = get_url(url, session = g_session)
-    result_data = js2py_val(result.content)
     result_list = []
+    if is_not_ok(result) :
+        log.Error("get_community_info url false", cityName, keyword, result.status_code)
+        return
+    result_data = js2py_val(result.content)
     if result_data["errno"] != 0:
         log.Error("get_community_info not ok", cityName, keyword)
         return result_list
-
+    if len(result_data["data"]) == 0:
+        log.Waring("get_community_info data is nil")
+        return result_list
     for data in result_data["data"]["result"]:
         if filter_word and not filter_word in data["region"]:
             log.Info("get_community_info ingore by filter_word", cityName, keyword, data)
@@ -52,9 +56,10 @@ def get_community_info(cityName, keyword, filter_word = None):
         new_data = {
             "name" : data["text"],
             "id" : data["id"],
+            "region":data["region"],
             "house_data" : {},
         }
-        get_house_list(data["id"])
+        new_data["house_data"] = get_house_list(data["id"])
         result_list.append(new_data)
     
 
@@ -101,12 +106,12 @@ def get_house_list(cid):
             d = {}
             for li in ls:
                 ls1 = li.xpath('./span/text()')
-                if len(ls1) > 0 and trim_str(ls1[0]) == "抵押信息": #特殊处理该处信息
-                    ls2 = li.xpath('./span/span/text()')
+                if len(ls1) > 1 and trim_str(ls1[0]) == "抵押信息": #特殊处理该处信息
+                    ls2 = ls1[1:]
                 else:
                     ls2 = li.xpath('./text()')
                 if len(ls1) == 0 or len(ls2) == 0:
-                    log.Waring("get_house_list -> get_info base false")
+                    log.Waring("get_house_list -> get_info base false", ls1, ls2)
                     continue
                 k = trim_str(ls1[0])
                 v = trim_str(ls2[0])
@@ -142,7 +147,8 @@ def get_house_list(cid):
     
     return result_map
 
-
+def get_all_community(cityName):
+    return []
 
 ###################### 对外接口 ######################
 
@@ -158,7 +164,19 @@ def start():
 
 @tools.check_use_time(30, tools.global_log, "start_community")
 def start_community():
-    pass
+    beike_conf = global_obj.get("config")["beike"]
+    for data in beike_conf["spiker_list"]:
+        cityName = data["city"]
+        if "all" in data:
+            community_list = get_all_community(cityName)
+        else:
+            community_list = data["community"]
+        filter = None
+        if "filter" in data:
+            filter = data["filter"]
+        for cName in community_list:
+            result_list = get_community_info(cityName, cName, filter)
+            print(result_list)
 
 
 
@@ -174,7 +192,8 @@ def init():
 
 @tools.check_use_time(1, tools.global_log)
 def test():
-    get_community_info("广州", "新天美地")
+    result = get_community_info("广州", "新天美地")
+    print(result)
 
 
 
