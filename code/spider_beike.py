@@ -6,7 +6,7 @@
 
 from lxml import etree
 
-import spiker
+
 import tools
 import log
 import codecs
@@ -14,7 +14,10 @@ import re
 import global_obj
 import csv
 
-from spiker import get_url,new_session,url_encode,js2py_val,is_not_ok
+import thread_tool
+
+
+from spider import get_url,new_session,url_encode,js2py_val,is_not_ok
 
 g_session = None
 
@@ -79,6 +82,7 @@ __pHouseID = re.compile(".*?(\d+)\.html")
 
 
 #通过小区ID找到房子
+@tools.check_use_time(2, tools.global_log, "小区二手房数据用时")
 def get_house_list(cid):
     url = "https://gz.ke.com/ershoufang/c%s/"%(cid)
     global g_session
@@ -154,6 +158,9 @@ def get_house_list(cid):
     
     return result_map
 
+
+
+
 def get_all_community(cityName):
     return []
 
@@ -192,19 +199,28 @@ def start():
 @tools.check_use_time(30, tools.global_log, "start_community")
 def start_community():
     beike_conf = global_obj.get("config")["beike"]
-    for data in beike_conf["spiker_list"]:
+    task_list = []
+    for data in beike_conf["spider_list"]:
         cityName = data["city"]
         if "all" in data:
             community_list = get_all_community(cityName)
         else:
             community_list = data["community"]
-        filter = None
+        filterWord = None
         if "filter" in data:
-            filter = data["filter"]
+            filterWord = data["filter"]
         for cName in community_list:
-            result_list = get_community_info(cityName, cName, filter)
-            for community in result_list.values():
-                save_community_csv(community)
+            task_list.append((cityName, cName, filterWord,))
+    
+    thread_tool.start_thread(use_thread, task_list)
+
+@tools.check_use_time(5, tools.global_log, "use_thread")
+def use_thread(threadobj, cityName, cName, filterWord):
+    log.Info("开始爬取<%s-%s>小区"%(cityName, cName))
+    result_list = get_community_info(cityName, cName, filterWord)
+    for community in result_list.values():
+        save_community_csv(community)
+    log.Info("抓取<%s-%s>小区完毕"%(cityName, cName))
 
 
 def init():

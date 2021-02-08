@@ -19,7 +19,7 @@
         "password":""
     },
     "beike":{
-        "spiker_list":[
+        "spider_list":[
             {
                 "city":"广州",
                 "filter":"增城",
