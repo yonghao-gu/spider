@@ -68,9 +68,10 @@ def get_community_info(cityName, keyword, filter_word = None):
             "name" : data["text"],
             "id" : data["id"],
             "region":data["region"],
-            "house_data" : {},
+            "house_url_list" : [],
+            "house_data":{},
         }
-        new_data["house_data"] = get_house_list(data["id"])
+        new_data["house_url_list"] = get_house_list(data["id"])
         result_list[new_data["id"]] = new_data
     
 
@@ -95,9 +96,11 @@ def get_house_list(cid):
     tree = etree.HTML(result.text)
     url_ls = tree.xpath('//div[@class="leftContent"]//ul[@class="sellListContent"]//li[@class="clear"]/a/@href')
 
-    #摘取房子信息
-    house = {}
+    return url_ls
 
+
+@tools.check_use_time(1, tools.global_log, "爬取房子信息超时")
+def get_house_info(url, house_data):
     def get_total(data, htree):
         ls  = htree.xpath('.//div[@class="overview"]//span[@class="total"]/text()')
         if len(ls) == 0 or not tools.is_float(ls[0]):
@@ -132,31 +135,27 @@ def get_house_list(cid):
         get_info2("base")
         get_info2("transaction")
 
-
-    result_map = {}
-    for url in url_ls:
-        r = re.match(__pHouseID, url)
-        if not r:
-            log.Error("get_house_list no hid", url)
-            continue
-        data = {
-            "id": r.groups()[0],
-        }
-        result,_ = get_url(url, session = g_session)
-        if result.status_code != 200 :
-            log.Waring("request house url false", url)
-            continue
-        htree = etree.HTML(result.text)
-        
-        ls = htree.xpath('//div[@class="sellDetailPage"]//div[@data-component="overviewIntro"]')
-        if len(ls) > 0:
-            get_total(data, ls[0])
-        ls = htree.xpath('//div[@class="sellDetailPage"]//div[@class="m-content"]//div[@class="box-l"]')
-        if len(ls) > 0:
-            get_info(data, ls[0])
-        result_map[data["id"]] = data
+    r = re.match(__pHouseID, url)
+    if not r:
+        log.Error("get_house_list no hid", url)
+        return None
+    house_info = {
+        "id": r.groups()[0],
+    }
+    result,_ = get_url(url, session = g_session)
+    if result.status_code != 200 :
+        log.Waring("request house url false", url)
+        return None
+    htree = etree.HTML(result.text)
     
-    return result_map
+    ls = htree.xpath('//div[@class="sellDetailPage"]//div[@data-component="overviewIntro"]')
+    if len(ls) > 0:
+        get_total(house_info, ls[0])
+    ls = htree.xpath('//div[@class="sellDetailPage"]//div[@class="m-content"]//div[@class="box-l"]')
+    if len(ls) > 0:
+        get_info(house_info, ls[0])
+    house_data[house_info["id"]] = house_info
+
 
 
 
@@ -190,14 +189,15 @@ def save_community_csv(data):
 
 
 
-@tools.check_use_time(30, tools.global_log, "start")
-def start():
-    pass
 
 
 
-@tools.check_use_time(30, tools.global_log, "start_community")
+
+@tools.check_use_time(0, tools.global_log, "所有小区新爬取完成，用时")
 def start_community():
+    '''
+    使用多线程爬取小区
+    '''
     beike_conf = global_obj.get("config")["beike"]
     task_list = []
     for data in beike_conf["spider_list"]:
@@ -212,15 +212,26 @@ def start_community():
         for cName in community_list:
             task_list.append((cityName, cName, filterWord,))
     
-    thread_tool.start_thread(use_thread, task_list)
+    task2_list = []
+    data_list = []
+    def _get_community_info(threadobj, cityName, cName, filterWord):
+        result_list = get_community_info(cityName, cName, filterWord)
+        data_list.extend(result_list.values())
+        for cid, data in result_list.items():
+            for url in data["house_url_list"]:
+                task2_list.append((url, data["house_data"]))
+            del data["house_url_list"]
 
-@tools.check_use_time(5, tools.global_log, "use_thread")
-def use_thread(threadobj, cityName, cName, filterWord):
-    log.Info("开始爬取<%s-%s>小区"%(cityName, cName))
-    result_list = get_community_info(cityName, cName, filterWord)
-    for community in result_list.values():
+
+    thread_tool.start_thread(_get_community_info, task_list, 5)
+    log.Info("爬取小区信息完毕")
+    def _get_house_info(tobj, url, house_data):
+        get_house_info(url, house_data)
+    
+    thread_tool.start_thread(_get_house_info, task2_list, 10)
+    for community in data_list:
         save_community_csv(community)
-    log.Info("抓取<%s-%s>小区完毕"%(cityName, cName))
+        log.Info("存储<%s-%s>小区完毕"%(community["city"], community["name"]))
 
 
 def init():
