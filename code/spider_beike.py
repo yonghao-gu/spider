@@ -12,13 +12,20 @@ import log
 import codecs
 import re
 import global_obj
+import csv
 
 from spiker import get_url,new_session,url_encode,js2py_val,is_not_ok
 
 g_session = None
 
+def trim_str(s):
+    return s.replace("\n", "").replace(" ", "")
+
+def __get_community_info_desc(cityName, keyword, filter_word = None):
+    return "获取小区信息:<%s-%s>完成"%(cityName,keyword)
 
 #获取小区信息
+@tools.check_use_time(5, tools.global_log, __get_community_info_desc)
 def get_community_info(cityName, keyword, filter_word = None):
     '''
     cityName: 城市
@@ -38,7 +45,7 @@ def get_community_info(cityName, keyword, filter_word = None):
 
     url = url_encode("https://ajax.api.ke.com/sug/headerSearch", data)
     result,_ = get_url(url, session = g_session)
-    result_list = []
+    result_list = {}
     if is_not_ok(result) :
         log.Error("get_community_info url false", cityName, keyword, result.status_code)
         return
@@ -54,13 +61,14 @@ def get_community_info(cityName, keyword, filter_word = None):
             log.Info("get_community_info ingore by filter_word", cityName, keyword, data)
             continue
         new_data = {
+            "city":cityName,
             "name" : data["text"],
             "id" : data["id"],
             "region":data["region"],
             "house_data" : {},
         }
         new_data["house_data"] = get_house_list(data["id"])
-        result_list.append(new_data)
+        result_list[new_data["id"]] = new_data
     
 
     return result_list
@@ -68,8 +76,7 @@ def get_community_info(cityName, keyword, filter_word = None):
 __pHouseID = re.compile(".*?(\d+)\.html")
 
 
-def trim_str(s):
-    return s.replace("\n", "").replace(" ", "")
+
 
 #通过小区ID找到房子
 def get_house_list(cid):
@@ -92,7 +99,7 @@ def get_house_list(cid):
         if len(ls) == 0 or not tools.is_float(ls[0]):
             log.Waring("get_house_list -> get_total false")
             return
-        data["total"] = tools.tofloat(ls[0])
+        data["价格"] = tools.tofloat(ls[0])
     
     def get_info(data, htree):
         #基本属性
@@ -115,8 +122,8 @@ def get_house_list(cid):
                     continue
                 k = trim_str(ls1[0])
                 v = trim_str(ls2[0])
-                d[k] = v
-            data[key] = d
+                data[k] = v
+            #data[key] = d
 
         get_info2("base")
         get_info2("transaction")
@@ -150,9 +157,29 @@ def get_house_list(cid):
 def get_all_community(cityName):
     return []
 
+
+
+
 ###################### 对外接口 ######################
 
+DATA_PATH = "./tmp/"
 
+
+
+def save_community_csv(data):
+    #print("data", data)
+    file = DATA_PATH + "%s_%s.csv"%(data["name"], data["region"])
+    f = open(file,'w', encoding="utf-8", newline='')
+    writer = csv.writer(f)
+    format_list = None
+    for hid, house in data["house_data"].items():
+        if not format_list:
+            format_list = house.keys()
+            writer.writerow(format_list)
+        row = [ house.get(s,"") for s in format_list]
+        writer.writerow(row)
+    
+    f.close()
 
 
 
@@ -176,8 +203,8 @@ def start_community():
             filter = data["filter"]
         for cName in community_list:
             result_list = get_community_info(cityName, cName, filter)
-            print(result_list)
-
+            for community in result_list.values():
+                save_community_csv(community)
 
 
 def init():
@@ -192,10 +219,13 @@ def init():
 
 @tools.check_use_time(1, tools.global_log)
 def test():
-    result = get_community_info("广州", "新天美地")
-    print(result)
-
-
+    #result = get_community_info("广州", "新天美地")
+    
+    file = "./tmp/新天美地花园_ 荔城富鹏_增城.csv"
+    writer = csv.writer(open(file,'w', encoding="utf-8", newline=''))
+    writer.writerow(("a","b","c"))
+    writer.writerow(("a","b","c"))
+    writer.writerow(("sssa","ddb","cff"))
 
 
 
