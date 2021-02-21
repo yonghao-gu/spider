@@ -99,12 +99,12 @@ def get_house_list(cid):
     return url_ls
 
 
-@tools.check_use_time(1, tools.global_log, "爬取房子信息超时")
+@tools.check_use_time(5, tools.global_log, "爬取房子信息超时")
 def get_house_info(url, house_data):
     def get_total(data, htree):
         ls  = htree.xpath('.//div[@class="overview"]//span[@class="total"]/text()')
         if len(ls) == 0 or not tools.is_float(ls[0]):
-            log.Waring("get_house_list -> get_total false")
+            log.Waring("get_house_info -> get_total false")
             return
         data["价格"] = tools.tofloat(ls[0])
     
@@ -115,7 +115,7 @@ def get_house_info(url, house_data):
             parttern = './div[@data-component="baseinfo"]//div[@class="introContent"]//div[@class="%s"]//ul//li'%(key)
             ls = htree.xpath(parttern)
             if len(ls) == 0:
-                log.Waring("get_house_list -> get_info -> get_info2 false", key)
+                log.Waring("get_house_info -> get_info -> get_info2 false", key)
                 return
             d = {}
             for li in ls:
@@ -125,7 +125,7 @@ def get_house_info(url, house_data):
                 else:
                     ls2 = li.xpath('./text()')
                 if len(ls1) == 0 or len(ls2) == 0:
-                    log.Waring("get_house_list -> get_info base false", ls1, ls2)
+                    log.Waring("get_house_info -> get_info base false", ls1, ls2)
                     continue
                 k = trim_str(ls1[0])
                 v = trim_str(ls2[0])
@@ -137,7 +137,7 @@ def get_house_info(url, house_data):
 
     r = re.match(__pHouseID, url)
     if not r:
-        log.Error("get_house_list no hid", url)
+        log.Error("get_house_info no hid", url)
         return None
     house_info = {
         "id": r.groups()[0],
@@ -187,11 +187,28 @@ def save_community_csv(data):
     
     f.close()
 
-
-
-
-
-
+@tools.check_use_time(0, tools.global_log, "保存结果用时")
+def save_excel(data_list, collect = True):
+    import excel_tool
+    obj_list = []
+    head_list = None
+    file = DATA_PATH + "结果"
+    all_list = []
+    for data in data_list:
+        save_data = []
+        for _, house in data["house_data"].items():
+            if not head_list:
+                head_list = list(house.keys())
+            l = [ house.get(s,"") for s in head_list]
+            save_data.append(l)
+            if collect:
+                all_list.append([data["name"]] + l)
+            
+        obj_list.append(excel_tool.CSheetObject(data["name"], head_list, save_data))
+    if collect:
+        obj = excel_tool.CSheetObject("汇总", ["小区"] + head_list, all_list)
+        obj_list.insert(0, obj)
+    excel_tool.save_excel(file, obj_list)
 
 @tools.check_use_time(0, tools.global_log, "所有小区新爬取完成，用时")
 def start_community():
@@ -223,15 +240,24 @@ def start_community():
             del data["house_url_list"]
 
 
+
     thread_tool.start_thread(_get_community_info, task_list, 5)
-    log.Info("爬取小区信息完毕")
+    log.Info("爬取小区信息完毕", len(task_list), len(task2_list))
+    global g_count
+    g_count = 0
     def _get_house_info(tobj, url, house_data):
         get_house_info(url, house_data)
-    
+
+        
+    log.Info("开始爬取所有信息", len(task2_list))
+    # if True:
+    #     return
     thread_tool.start_thread(_get_house_info, task2_list, 10)
-    for community in data_list:
-        save_community_csv(community)
-        log.Info("存储<%s-%s>小区完毕"%(community["city"], community["name"]))
+    log.Info("爬取所有信息完成")
+    save_excel(data_list)
+    # for community in data_list:
+    #     save_community_csv(community)
+    #     log.Info("存储<%s-%s>小区完毕"%(community["city"], community["name"]))
 
 
 def init():
