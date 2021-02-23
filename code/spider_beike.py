@@ -171,7 +171,7 @@ def get_all_community(cityName):
 DATA_PATH = "./tmp/"
 
 
-
+##将数据保存CSV
 def save_community_csv(data):
     #print("data", data)
     file = DATA_PATH + "%s_%s.csv"%(data["name"], data["region"])
@@ -199,6 +199,8 @@ def save_excel(data_list, collect = True):
         for _, house in data["house_data"].items():
             if not head_list:
                 head_list = list(house.keys())
+                if not "配备电梯" in head_list:
+                    head_list.append("配备电梯")
             l = [ house.get(s,"") for s in head_list]
             save_data.append(l)
             if collect:
