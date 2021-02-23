@@ -5,11 +5,13 @@ import os
 libpath = os.path.abspath("./lib")
 sys.path.append(libpath)
 
-
+from mailtool import mail
 import spider_beike
 import log
 import global_obj
 import config_op
+import beike_db
+
 
 def init_log(filename = None):
     obj = log.CFileLog(filename)
@@ -20,16 +22,30 @@ def init_config(config_file):
     global_obj.set("config", data)
 
 
+def init_mail():
+    config = global_obj.get("config")
+    mail_data = config["mail"]
+    obj = mail.CMailBox(mail_data["user"], mail_data["password"], mail_data["host"])
+    obj.SetSender(mail_data["user"])
+    for name in mail_data["to"]:
+        obj.SetReceive(name)
+    global_obj.set("mail", obj)
 
 
-def main(config_file):
+
+def init_base(config_file):
     init_config(config_file)
     init_log()
 
+def main(config_file):
+    init_base(config_file)
+    beike_db.init_db()
+    init_mail()
     spider_beike.init()
 
-    spider_beike.start_community()
-    #spider_beike.test()
+    spider_beike.beike_task()
+    #spider_beike.start_community()
+
     log.Sys("start ok")
 
 

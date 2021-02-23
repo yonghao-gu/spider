@@ -15,9 +15,13 @@ import global_obj
 import csv
 
 import thread_tool
-
+import beike_db
 
 from spider import get_url,new_session,url_encode,js2py_val,is_not_ok
+
+from mailtool import mail
+from mailtool import html
+
 
 g_session = None
 
@@ -158,6 +162,83 @@ def get_house_info(url, house_data):
 
 
 
+def send_diff_mail(diff_list):
+    if len(diff_list) == 0:
+        Log.Info("no beike diff")
+        return
+    htmobj = html.CHtml("房奴调研:")
+    def desc_house(data):
+        s = ""
+        for k,v in data.items():
+            s+="<%s %s>"%(k,v)
+        return s
+
+    for data in diff_list:
+        htmobj.AddLine("="*15) 
+        htmobj.AddLine("小区<%s>信息发生变化"%(data["name"]))
+        if len(data["new"]) > 0:
+            htmobj.AddLine("新增房源:")
+            for v in data["new"]:
+                htmobj.AddLine(htmobj.Font(desc_house(v), "blue"))
+        if len(data["del"]) > 0:
+            htmobj.AddLine("有房源被删除:")
+            for v in data["del"]:
+                htmobj.AddLine(htmobj.Font(desc_house(v), "green"))
+        if len(data["diff"]) > 0 :
+            htmobj.AddLine("房源信息发生变化:")
+            for v in data["diff"]:
+                v1 = v[0]
+                v2 = v[1]
+                htmobj.AddLine("-"*15) 
+                htmobj.AddLine(htmobj.Font(desc_house(v1), "red"))
+                htmobj.AddLine(htmobj.Font(desc_house(v2), "green"))
+                htmobj.AddLine("+"*15) 
+        htmobj.AddLine("*"*15) 
+    html_text = htmobj.GetHtml()
+    mailobj = global_obj.get("mail")
+    message  = mailobj.HtmlMailMessage()
+    if message.SendMessage("房奴调研", html_text):
+        log.Info("send beike mail done")
+
+
+
+def check_diff(now, old):
+    now_house_data = now["house_data"]
+    old_house_data = old["house_data"]
+    now_set = set(now_house_data.keys())
+    old_set = set(old_house_data.keys())
+    diff_flag = False
+    result = {
+        "id":now["id"],
+        "name":now["name"],
+        "new":[],
+        "del":[],
+        "diff":[],
+    }
+    #找出新增和删除的
+    if len(now_set^old_set) != 0:
+        new_list = list(now_set - old_set)
+        del_list = list(old_set - now_set)
+        result["new"] = [ now_house_data[hid] for hid in new_list]
+        result["del"] = [ old_house_data[hid] for hid in del_list ]
+        diff_flag = True
+    
+    def is_diff(now_data, old_data):
+        for k,v in old_data.items():
+            v1 = now_data.get(k, "")
+            if  type(v) != type(v1) or v != v1:
+                return True
+        return False
+
+
+    for hid, data in old_house_data.items():
+        if hid in now_house_data:
+            now_data = now_house_data[hid]
+            if is_diff(now_data, data):
+                diff_flag = True
+                result["diff"].append([now_data, data])
+    result["is_diff"] = diff_flag
+    return result
 
 
 def get_all_community(cityName):
@@ -257,9 +338,25 @@ def start_community():
     thread_tool.start_thread(_get_house_info, task2_list, 10)
     log.Info("爬取所有信息完成")
     save_excel(data_list)
+    log.Info("保存excel完成")
     # for community in data_list:
     #     save_community_csv(community)
     #     log.Info("存储<%s-%s>小区完毕"%(community["city"], community["name"]))
+    return data_list
+
+def beike_task():
+    data_list = start_community()
+    diff_list = []
+    for data in data_list:
+        ret = beike_db.load_xiaoqu(data["id"])
+        if ret:
+            ret = check_diff(data, ret)
+            if ret["is_diff"]:
+                diff_list.append(ret)
+        beike_db.save_xiaoqu(data["id"],data)
+    log.Info("数据保存完毕")
+    send_diff_mail(diff_list)
+
 
 
 def init():
