@@ -133,11 +133,16 @@ def get_house_info(url, house_data):
                     continue
                 k = trim_str(ls1[0])
                 v = trim_str(ls2[0])
+                if k == "建筑面积" or k == "套内面积":
+                    v = tools.tofloat(v.replace("㎡", ""),5)
+                
                 data[k] = v
             #data[key] = d
 
         get_info2("base")
         get_info2("transaction")
+        if "价格" in data and "建筑面积" in data:
+            data["均价"] = tools.tofloat(float(data["价格"])/float(data["建筑面积"]),5)
 
     r = re.match(__pHouseID, url)
     if not r:
@@ -262,25 +267,30 @@ def save_community_csv(data):
 @tools.check_use_time(0, tools.global_log, "保存结果用时")
 def save_excel(data_list, collect = True):
     import excel_tool
+
     obj_list = []
-    head_list = None
+    head_list = [
+    "小区","id","价格","均价","建筑面积","套内面积",
+    "配备电梯","挂牌时间","房屋户型","所在楼层",
+    "户型结构","建筑类型","房屋朝向","建筑结构",
+    "装修情况","梯户比例","交易权属","上次交易",
+    "房屋用途","房屋年限","产权所属","抵押信息",
+    "房本备件"
+    ]
     file = DATA_PATH + "结果"
     all_list = []
     for data in data_list:
         save_data = []
         for _, house in data["house_data"].items():
-            if not head_list:
-                head_list = list(house.keys())
-                if not "配备电梯" in head_list:
-                    head_list.append("配备电梯")
-            l = [ house.get(s,"") for s in head_list]
+
+            l = [ data["name"] if s == "小区" else house.get(s,"") for s in head_list]
             save_data.append(l)
             if collect:
-                all_list.append([data["name"]] + l)
+                all_list.append(l)
             
         obj_list.append(excel_tool.CSheetObject(data["name"], head_list, save_data))
     if collect:
-        obj = excel_tool.CSheetObject("汇总", ["小区"] + head_list, all_list)
+        obj = excel_tool.CSheetObject("汇总", head_list, all_list)
         obj_list.insert(0, obj)
     excel_tool.save_excel(file, obj_list)
 
