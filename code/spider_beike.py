@@ -164,36 +164,27 @@ def get_house_info(url, house_data):
 
 def send_diff_mail(diff_list):
     if len(diff_list) == 0:
-        Log.Info("no beike diff")
+        log.Info("no beike diff")
         return
     htmobj = html.CHtml("房奴调研:")
-    def desc_house(data):
-        s = ""
-        for k,v in data.items():
-            s+="<%s %s>"%(k,v)
-        return s
-
     for data in diff_list:
-        htmobj.AddLine("="*15) 
+        htmobj.AddLine("="*30) 
         htmobj.AddLine("小区<%s>信息发生变化"%(data["name"]))
         if len(data["new"]) > 0:
             htmobj.AddLine("新增房源:")
-            for v in data["new"]:
-                htmobj.AddLine(htmobj.Font(desc_house(v), "blue"))
+            htmobj.AddDict2Table(data["new"])
         if len(data["del"]) > 0:
             htmobj.AddLine("有房源被删除:")
-            for v in data["del"]:
-                htmobj.AddLine(htmobj.Font(desc_house(v), "green"))
+            htmobj.AddDict2Table(data["del"])
         if len(data["diff"]) > 0 :
             htmobj.AddLine("房源信息发生变化:")
             for v in data["diff"]:
                 v1 = v[0]
                 v2 = v[1]
-                htmobj.AddLine("-"*15) 
-                htmobj.AddLine(htmobj.Font(desc_house(v1), "red"))
-                htmobj.AddLine(htmobj.Font(desc_house(v2), "green"))
-                htmobj.AddLine("+"*15) 
-        htmobj.AddLine("*"*15) 
+                htmobj.AddLine("-"*30)
+                htmobj.AddDict2Table(v)
+                htmobj.AddLine("+"*30) 
+        htmobj.AddLine("*"*30) 
     html_text = htmobj.GetHtml()
     mailobj = global_obj.get("mail")
     message  = mailobj.HtmlMailMessage()
@@ -333,19 +324,16 @@ def start_community():
 
         
     log.Info("开始爬取所有信息", len(task2_list))
-    # if True:
-    #     return
     thread_tool.start_thread(_get_house_info, task2_list, 10)
     log.Info("爬取所有信息完成")
-    save_excel(data_list)
-    log.Info("保存excel完成")
-    # for community in data_list:
-    #     save_community_csv(community)
-    #     log.Info("存储<%s-%s>小区完毕"%(community["city"], community["name"]))
     return data_list
 
+@tools.check_use_time(0, tools.global_log, "beike_task完成")
 def beike_task():
     data_list = start_community()
+    save_excel(data_list)
+    log.Info("保存excel完成")
+
     diff_list = []
     for data in data_list:
         ret = beike_db.load_xiaoqu(data["id"])

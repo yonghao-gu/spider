@@ -22,14 +22,6 @@ def init_config(config_file):
     global_obj.set("config", data)
 
 
-def init_mail():
-    config = global_obj.get("config")
-    mail_data = config["mail"]
-    obj = mail.CMailBox(mail_data["user"], mail_data["password"], mail_data["host"])
-    obj.SetSender(mail_data["user"])
-    for name in mail_data["to"]:
-        obj.SetReceive(name)
-    global_obj.set("mail", obj)
 
 
 
@@ -37,16 +29,19 @@ def init_base(config_file):
     init_config(config_file)
     init_log()
 
+def start_sipder():
+    data_list = spider_beike.start_community()
+    spider_beike. save_excel(data_list)
+
 def main(config_file):
     init_base(config_file)
-    beike_db.init_db()
-    init_mail()
+    
+    
     spider_beike.init()
 
-    spider_beike.beike_task()
-    #spider_beike.start_community()
+    start_sipder()
 
-    log.Sys("start ok")
+    log.Sys("run done")
 
 
 
