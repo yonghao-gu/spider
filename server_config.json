@@ -1,15 +1,15 @@
 {
     "db": {
-        "addr": "47.107.152.146", 
-        "port": "8883", 
-        "user": "jiucai", 
-        "password": "a82993344"
+        "addr": "", 
+        "port": "", 
+        "user": "", 
+        "password": ""
     },
     "mail":{
-        "user":"a82991732@163.com",
-        "password":"LGIKZRNTNDZVMUQT",
-        "host":"smtp.163.com",
-        "to":["15718448803@163.com","546405308@qq.com"],
+        "user":"",
+        "password":"",
+        "host":"",
+        "to":[""],
         "port":465
     },
     "log":"./log.log",
