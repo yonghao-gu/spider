@@ -33,14 +33,17 @@ def start_sipder():
     data_list = spider_beike.start_community()
     spider_beike. save_excel(data_list)
 
+def test1():
+    spider_beike.beike_task()
+
 def main(config_file):
     init_base(config_file)
     
     
     spider_beike.init()
 
-    start_sipder()
-
+    #start_sipder()
+    test1()
     log.Sys("run done")
 
 

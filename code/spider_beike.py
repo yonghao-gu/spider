@@ -124,10 +124,14 @@ def get_house_info(url, house_data):
             d = {}
             for li in ls:
                 ls1 = li.xpath('./span/text()')
+                
                 if len(ls1) > 1 and trim_str(ls1[0]) == "抵押信息": #特殊处理该处信息
                     ls2 = ls1[1:]
                 else:
-                    ls2 = li.xpath('./text()')
+                    if key == "transaction": #交易属性
+                        ls2 = li.xpath('.//a/text()')
+                    else:
+                        ls2 = li.xpath('./text()')
                 if len(ls1) == 0 or len(ls2) == 0:
                     log.Waring("get_house_info -> get_info base false", ls1, ls2)
                     continue
