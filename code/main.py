@@ -12,6 +12,14 @@ import global_obj
 import config_op
 import beike_db
 
+def init_mail():
+    config = global_obj.get("config")
+    mail_data = config["mail"]
+    obj = mail.CMailBox(mail_data["user"], mail_data["password"], mail_data["host"])
+    obj.SetSender(mail_data["user"])
+    for name in mail_data["to"]:
+        obj.SetReceive(name)
+    global_obj.set("mail", obj)
 
 def init_log(filename = None):
     obj = log.CFileLog(filename)
@@ -31,15 +39,15 @@ def init_base(config_file):
 
 def start_sipder():
     data_list = spider_beike.start_community()
-    spider_beike. save_excel(data_list)
+    spider_beike.save_excel(data_list)
 
 def test1():
     spider_beike.beike_task()
 
 def main(config_file):
     init_base(config_file)
-    
-    
+    init_mail()
+    beike_db.init_db()
     spider_beike.init()
 
     #start_sipder()

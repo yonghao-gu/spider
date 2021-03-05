@@ -58,10 +58,11 @@ def get_community_info(cityName, keyword, filter_word = None):
         return
     result_data = js2py_val(result.content)
     if result_data["errno"] != 0:
-        log.Error("get_community_info not ok", cityName, keyword)
+        log.Error("get_community_info not ok", cityName, keyword, keyword)
         return result_list
+    
     if len(result_data["data"]) == 0:
-        log.Waring("get_community_info data is nil")
+        log.Waring("get_community_info data is nil", cityName, result)
         return result_list
     for data in result_data["data"]["result"]:
         if filter_word and not filter_word in data["region"]:
@@ -176,6 +177,21 @@ def send_diff_mail(diff_list):
         log.Info("no beike diff")
         return
     htmobj = html.CHtml("房奴调研:")
+
+    def set_dff_house(new, old):
+        head_list = new.keys()
+        tbl_list = []
+        t2 = []
+        for key in head_list:
+            v1 = str(new.get(key, "NULL"))
+            if v1 != str(old.get(key, "NULL")) :
+                t2.append(htmobj.Font(v1, "red"))
+            else:
+                t2.append(v1)
+        tbl_list.append(t2)
+        tbl_list.append([ str(old.get(key, "NULL")) for key in head_list])
+        htmobj.AddTable(tbl_list, head_list)
+
     for data in diff_list:
         htmobj.AddLine("="*30) 
         htmobj.AddLine("小区<%s>信息发生变化"%(data["name"]))
@@ -191,7 +207,7 @@ def send_diff_mail(diff_list):
                 v1 = v[0]
                 v2 = v[1]
                 htmobj.AddLine("-"*30)
-                htmobj.AddDict2Table(v)
+                set_dff_house(v1, v2)
                 htmobj.AddLine("+"*30) 
         htmobj.AddLine("*"*30) 
     html_text = htmobj.GetHtml()
@@ -281,7 +297,8 @@ def save_excel(data_list, collect = True):
     "房屋用途","房屋年限","产权所属","抵押信息",
     "房本备件"
     ]
-    file = DATA_PATH + "结果"
+    config = global_obj.get("config")["beike"]
+    file = DATA_PATH + config.get("output", "结果")
     all_list = []
     for data in data_list:
         save_data = []
@@ -292,7 +309,7 @@ def save_excel(data_list, collect = True):
             if collect:
                 all_list.append(l)
             
-        obj_list.append(excel_tool.CSheetObject(data["name"], head_list, save_data))
+        obj_list.append(excel_tool.CSheetObject("%s_%s"%(data["name"], data["id"]), head_list, save_data))
     if collect:
         obj = excel_tool.CSheetObject("汇总", head_list, all_list)
         obj_list.insert(0, obj)
@@ -344,6 +361,7 @@ def start_community():
 
 @tools.check_use_time(0, tools.global_log, "beike_task完成")
 def beike_task():
+    init() #需要重新获取session
     data_list = start_community()
     save_excel(data_list)
     log.Info("保存excel完成")

@@ -33,6 +33,8 @@ def add_task():
     taskobj1 = CTask("spider_beike", time1, start_task, run_type = CTask.TForever)
     task_timer.AddTask(taskobj1)
 
+
+
 def main_task(config_file):
     main.init_base(config_file)
     beike_db.init_db()
